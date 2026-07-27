@@ -25,12 +25,22 @@ interface Vm {
     #[cheatcode(group = Credible, safety = Safe)]
     function assertion(address adopter, bytes calldata createData, bytes4 fnSelector) external;
 
-    /// Stages an anomaly score (basis points, `0..=10_000`) for `target` that the executor's
-    /// `AnomalySubsystem` will return on the next `cl.assertion(...)` invocation. Targets not
-    /// staged with this cheatcode are not scored (fail open). Call multiple times to stage
-    /// scores for multiple targets before invoking `cl.assertion`.
+    /// Stages an anomaly verdict for `target` that the executor's `AnomalySubsystem` will return
+    /// on the next `cl.assertion(...)` invocation.
+    ///
+    /// `scoreBps` is the anomaly probability in basis points (`0..=10_000`). `firesAt` is the
+    /// strictest sensitivity level (`1..=10`) that score clears; `0` clears none. A
+    /// `watchAnomaly(target, selector, level)` trigger fires when `firesAt != 0 && level >=
+    /// firesAt`, so `firesAt` is what decides whether the assertion runs at all — staging a high
+    /// `scoreBps` with `firesAt` of `0` leaves it inert.
+    ///
+    /// There is no model in a test, so both halves are stated rather than derived: a real
+    /// deployment resolves `firesAt` from the target's own trained ladder.
+    ///
+    /// Targets not staged with this cheatcode are not scored (fail open). Call multiple times to
+    /// stage verdicts for multiple targets before invoking `cl.assertion`.
     #[cheatcode(group = Credible, safety = Safe)]
-    function setAnomalyScore(address target, uint16 scoreBps) external;
+    function setAnomalyScore(address target, uint16 scoreBps, uint8 firesAt) external;
 
 
     //  ======== Types ========

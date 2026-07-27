@@ -539,7 +539,10 @@ pub struct Cheatcodes<FEN: FoundryEvmNetwork = EthEvmNetwork> {
     /// anomaly subsystem during the next `cl.assertion(...)` invocation. Cleared
     /// after the assertion executes.
     #[cfg(feature = "credible")]
-    pub anomaly_scores: std::collections::HashMap<alloy_primitives::Address, u16>,
+    pub anomaly_scores: std::collections::HashMap<
+        alloy_primitives::Address,
+        assertion_executor::AnomalyVerdict,
+    >,
 
     /// Assume next call can revert and discard fuzz run if it does.
     pub assume_no_revert: Option<AssumeNoRevert>,

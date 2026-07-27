@@ -229,9 +229,7 @@
         {
           "description": "Cheatcodes that are related to the Phylax Credible Layer\n\nExamples: `assertion`.\n\nSafety: safe",
           "type": "string",
-          "enum": [
-            "credible"
-          ]
+          "const": "credible"
         },
         {
           "description": "Cheatcodes that read from, or write to the current EVM execution state.\n\nExamples: any of the `record` cheatcodes, `chainId`, `coinbase`.\n\nSafety: ambiguous, depends on whether the cheatcode is read-only or not.",

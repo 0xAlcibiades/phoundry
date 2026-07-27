@@ -18,6 +18,13 @@ workspace = true
 
 [dependencies]
 foundry-fork-db = { workspace = true, optional = true }
+# `--features credible` does not build against this pin: it predates the anomaly seam entirely, so
+# it exports neither `AnomalySubsystem` nor `AnomalyVerdict`. `credible.rs` targets the current
+# credible-sdk seam, `AnomalySubsystem::evaluate(&Trace) -> Option<AnomalyScoreMap>`, and needs a
+# rev bump to reach it. The bump is blocked upstream of this file: credible-sdk moved to reth 2.4.1
+# (revm 41, alloy 2.2) while phoundry is on revm 11, and the two disagree on `AccountChanges`
+# (`revm-state`'s versus `alloy-eip7928`'s), which fails `reth-storage-api` before any of this
+# crate compiles. Reconciling phoundry's EVM stack comes first.
 assertion-executor = { git = "https://github.com/phylaxsystems/credible-sdk.git", rev = "3c61e5127fe56f0bb2bb62d0dcf9cdcc60ff98b0", features = ["phoundry"], optional = true }
 
 foundry-cheatcodes-spec.workspace = true

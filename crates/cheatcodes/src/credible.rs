@@ -1,8 +1,7 @@
 use crate::{Cheatcode, Cheatcodes, CheatcodesExecutor, CheatsCtxt, Result, Vm::*};
 use alloy_primitives::{Bytes, FixedBytes, TxKind, U16};
 use assertion_executor::{
-    AssertionExecutor, ExecutorConfig,
-    anomaly::AnomalySubsystem,
+    AnomalyScoreMap, AnomalySubsystem, AnomalyVerdict, AssertionExecutor, ExecutorConfig, Trace,
     db::{DatabaseCommit, DatabaseRef, fork_db::ForkDb},
     inspectors::CallTracer,
     native::registry::NativeAssertionRegistry,
@@ -103,37 +102,37 @@ impl Cheatcode for assertionCall {
 
 impl Cheatcode for setAnomalyScoreCall {
     fn apply_stateful<FEN: FoundryEvmNetwork>(&self, ccx: &mut CheatsCtxt<'_, '_, FEN>) -> Result {
-        let Self { target, scoreBps: score_bps } = self;
-        ccx.state.anomaly_scores.insert(*target, *score_bps);
+        let Self { target, scoreBps: score_bps, firesAt: fires_at } = self;
+        ccx.state
+            .anomaly_scores
+            .insert(*target, AnomalyVerdict { score_bps: *score_bps, fires_at: *fires_at });
         Ok(Default::default())
     }
 }
 
-/// Test-only [`AnomalySubsystem`] backed by a fixed `target -> scoreBps` map staged via
+/// Test-only [`AnomalySubsystem`] backed by a fixed `target -> verdict` map staged via
 /// `cl.setAnomalyScore(...)`. Returns the staged map verbatim regardless of the tx being
 /// evaluated; targets absent from the map are not scored.
+///
+/// A test has no trained model, so the verdict's `fires_at` — the strictest sensitivity level the
+/// score clears — is stated by the test rather than resolved from a ladder. That is what decides
+/// whether a `watchAnomaly` trigger fires at all, so it is the half a test usually cares about.
 #[derive(Debug, Clone, Default)]
 struct PhoundryAnomalySubsystem {
-    scores: HashMap<Address, U16>,
+    scores: AnomalyScoreMap,
 }
 
 impl PhoundryAnomalySubsystem {
-    fn from_raw(raw: HashMap<Address, u16>) -> Self {
-        Self {
-            scores: raw.into_iter().map(|(addr, bps)| (addr, U16::from(bps))).collect(),
-        }
+    fn from_raw(raw: HashMap<Address, AnomalyVerdict>) -> Self {
+        Self { scores: raw.into_iter().collect() }
     }
 }
 
 impl AnomalySubsystem for PhoundryAnomalySubsystem {
-    fn evaluate(
-        &self,
-        _tracer: &CallTracer,
-        _tx_env: &TxEnv,
-        _block_env: &BlockEnv,
-        _result: &ResultAndState,
-    ) -> HashMap<Address, U16> {
-        self.scores.clone()
+    fn evaluate(&self, _trace: &Trace<'_>) -> Option<AnomalyScoreMap> {
+        // `None` would decline the whole transaction; an empty map is "scored nothing", which is
+        // what an un-staged test should look like.
+        Some(self.scores.clone())
     }
 }
 

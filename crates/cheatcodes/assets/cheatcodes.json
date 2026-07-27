@@ -9873,17 +9873,17 @@
     {
       "func": {
         "id": "setAnomalyScore",
-        "description": "Stages an anomaly score (basis points, `0..=10_000`) for `target` that the executor's\n`AnomalySubsystem` will return on the next `cl.assertion(...)` invocation. Targets not\nstaged with this cheatcode are not scored (fail open). Call multiple times to stage\nscores for multiple targets before invoking `cl.assertion`.",
-        "declaration": "function setAnomalyScore(address target, uint16 scoreBps) external;",
+        "description": "Stages an anomaly verdict for `target` that the executor's `AnomalySubsystem` will return\non the next `cl.assertion(...)` invocation.\n`scoreBps` is the anomaly probability in basis points (`0..=10_000`). `firesAt` is the\nstrictest sensitivity level (`1..=10`) that score clears; `0` clears none. A\n`watchAnomaly(target, selector, level)` trigger fires when `firesAt != 0 && level >=\nfiresAt`, so `firesAt` is what decides whether the assertion runs at all — staging a high\n`scoreBps` with `firesAt` of `0` leaves it inert.\nThere is no model in a test, so both halves are stated rather than derived: a real\ndeployment resolves `firesAt` from the target's own trained ladder.\nTargets not staged with this cheatcode are not scored (fail open). Call multiple times to\nstage verdicts for multiple targets before invoking `cl.assertion`.",
+        "declaration": "function setAnomalyScore(address target, uint16 scoreBps, uint8 firesAt) external;",
         "visibility": "external",
         "mutability": "",
-        "signature": "setAnomalyScore(address,uint16)",
-        "selector": "0x36285dfc",
+        "signature": "setAnomalyScore(address,uint16,uint8)",
+        "selector": "0x1ee1127b",
         "selectorBytes": [
-          54,
-          40,
-          93,
-          252
+          30,
+          225,
+          18,
+          123
         ]
       },
       "group": "credible",
