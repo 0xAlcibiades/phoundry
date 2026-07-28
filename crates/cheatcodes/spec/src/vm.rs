@@ -28,19 +28,18 @@ interface Vm {
     /// Stages an anomaly verdict for `target` that the executor's `AnomalySubsystem` will return
     /// on the next `cl.assertion(...)` invocation.
     ///
-    /// `scoreBps` is the anomaly probability in basis points (`0..=10_000`). `firesAt` is the
-    /// strictest sensitivity level (`1..=10`) that score clears; `0` clears none. A
-    /// `watchAnomaly(target, selector, level)` trigger fires when `firesAt != 0 && level >=
-    /// firesAt`, so `firesAt` is what decides whether the assertion runs at all — staging a high
-    /// `scoreBps` with `firesAt` of `0` leaves it inert.
+    /// `firesAt` is the strictest sensitivity level (`1..=10`) the model's score clears; `0` clears
+    /// none. A `watchAnomaly(target, selector, level)` trigger fires when
+    /// `firesAt != 0 && level >= firesAt`, so this is the whole verdict — it decides whether the
+    /// assertion runs at all.
     ///
-    /// There is no model in a test, so both halves are stated rather than derived: a real
-    /// deployment resolves `firesAt` from the target's own trained ladder.
+    /// A deployment derives `firesAt` by resolving the score against the target's own trained
+    /// ladder. A test has no ladder, so it states the level directly.
     ///
     /// Targets not staged with this cheatcode are not scored (fail open). Call multiple times to
     /// stage verdicts for multiple targets before invoking `cl.assertion`.
     #[cheatcode(group = Credible, safety = Safe)]
-    function setAnomalyScore(address target, uint16 scoreBps, uint8 firesAt) external;
+    function setAnomalyLevel(address target, uint8 firesAt) external;
 
 
     //  ======== Types ========

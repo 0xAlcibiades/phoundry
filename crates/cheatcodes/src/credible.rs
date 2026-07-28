@@ -1,13 +1,12 @@
 use crate::{Cheatcode, Cheatcodes, CheatcodesExecutor, CheatsCtxt, Result, Vm::*};
-use alloy_primitives::{Bytes, FixedBytes, TxKind, U16};
+use alloy_primitives::{Bytes, FixedBytes, TxKind};
 use assertion_executor::{
-    AnomalyScoreMap, AnomalySubsystem, AnomalyVerdict, AssertionExecutor, ExecutorConfig, Trace,
+    AnomalySubsystem, AnomalyVerdict, AnomalyVerdictMap, AssertionExecutor, ExecutorConfig, Trace,
     db::{DatabaseCommit, DatabaseRef, fork_db::ForkDb},
-    inspectors::CallTracer,
     native::registry::NativeAssertionRegistry,
     primitives::{
         AccountInfo, Address, AssertionFunctionExecutionResult, B256, Bytecode, ExecutionResult,
-        ResultAndState, TxEnv, U256,
+        TxEnv, U256,
     },
     store::{AssertionState, AssertionStore},
 };
@@ -100,39 +99,36 @@ impl Cheatcode for assertionCall {
     }
 }
 
-impl Cheatcode for setAnomalyScoreCall {
+impl Cheatcode for setAnomalyLevelCall {
     fn apply_stateful<FEN: FoundryEvmNetwork>(&self, ccx: &mut CheatsCtxt<'_, '_, FEN>) -> Result {
-        let Self { target, scoreBps: score_bps, firesAt: fires_at } = self;
-        ccx.state
-            .anomaly_scores
-            .insert(*target, AnomalyVerdict { score_bps: *score_bps, fires_at: *fires_at });
+        let Self { target, firesAt: fires_at } = self;
+        ccx.state.anomaly_verdicts.insert(*target, AnomalyVerdict::new(*fires_at));
         Ok(Default::default())
     }
 }
 
 /// Test-only [`AnomalySubsystem`] backed by a fixed `target -> verdict` map staged via
-/// `cl.setAnomalyScore(...)`. Returns the staged map verbatim regardless of the tx being
+/// `cl.setAnomalyLevel(...)`. Returns the staged map verbatim regardless of the tx being
 /// evaluated; targets absent from the map are not scored.
 ///
-/// A test has no trained model, so the verdict's `fires_at` — the strictest sensitivity level the
-/// score clears — is stated by the test rather than resolved from a ladder. That is what decides
-/// whether a `watchAnomaly` trigger fires at all, so it is the half a test usually cares about.
+/// A test has no trained model, so `fires_at` — the strictest sensitivity level the score clears —
+/// is stated by the test rather than resolved from a ladder.
 #[derive(Debug, Clone, Default)]
 struct PhoundryAnomalySubsystem {
-    scores: AnomalyScoreMap,
+    verdicts: AnomalyVerdictMap,
 }
 
 impl PhoundryAnomalySubsystem {
     fn from_raw(raw: HashMap<Address, AnomalyVerdict>) -> Self {
-        Self { scores: raw.into_iter().collect() }
+        Self { verdicts: raw.into_iter().collect() }
     }
 }
 
 impl AnomalySubsystem for PhoundryAnomalySubsystem {
-    fn evaluate(&self, _trace: &Trace<'_>) -> Option<AnomalyScoreMap> {
+    fn evaluate(&self, _trace: &Trace<'_>) -> Option<AnomalyVerdictMap> {
         // `None` would decline the whole transaction; an empty map is "scored nothing", which is
         // what an un-staged test should look like.
-        Some(self.scores.clone())
+        Some(self.verdicts.clone())
     }
 }
 
@@ -254,18 +250,17 @@ pub fn execute_assertion<FEN: FoundryEvmNetwork>(
 
     let tx_env = build_tx_env(tx_attributes, ecx.tx(), chain_id, nonce);
 
-    // Consume any anomaly scores staged via `cl.setAnomalyScore(...)` and wire them
+    // Consume any anomaly verdicts staged via `cl.setAnomalyLevel(...)` and wire them
     // into the executor through a phoundry-local `AnomalySubsystem`. Default to an
     // empty map (fail-open) when nothing was staged.
-    let staged_scores = std::mem::take(&mut cheats.anomaly_scores);
-    let anomaly = Arc::new(PhoundryAnomalySubsystem::from_raw(staged_scores));
-    let mut assertion_executor =
-        AssertionExecutor::new_with_anomaly(
-            config,
-            store,
-            Arc::new(NativeAssertionRegistry::default()),
-            anomaly,
-        );
+    let staged_verdicts = std::mem::take(&mut cheats.anomaly_verdicts);
+    let anomaly = Arc::new(PhoundryAnomalySubsystem::from_raw(staged_verdicts));
+    let mut assertion_executor = AssertionExecutor::new_with_anomaly(
+        config,
+        store,
+        Arc::new(NativeAssertionRegistry::default()),
+        anomaly,
+    );
 
     let (raw_db, journal_inner) = ecx.db_journal_inner_mut();
     let state = journal_inner.state.clone();
